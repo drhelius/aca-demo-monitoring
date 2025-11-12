@@ -50,36 +50,6 @@ az acr create \
   --name $ACR_NAME \
   --sku Basic
 
-# Grant AcrPull permission to Container Apps Environment
-# This allows Container Apps to pull images from ACR
-ACA_ENV_IDENTITY=$(az containerapp env show \
-  --name $ACA_ENV \
-  --resource-group $RG \
-  --query properties.appLogsConfiguration.logAnalyticsConfiguration.customerId \
-  --output tsv)
-
-# Get the Container Apps Environment's system-assigned identity
-ACA_ENV_PRINCIPAL_ID=$(az containerapp env show \
-  --name $ACA_ENV \
-  --resource-group $RG \
-  --query identity.principalId \
-  --output tsv)
-
-# If the environment doesn't have a managed identity, enable it
-if [ -z "$ACA_ENV_PRINCIPAL_ID" ] || [ "$ACA_ENV_PRINCIPAL_ID" == "null" ]; then
-    az containerapp env identity assign \
-    --name "$ACA_ENV" \
-    --resource-group "$RG" \
-    --system-assigned
-
-    # Leer el principalId del Environment
-    ACA_ENV_PRINCIPAL_ID=$(az containerapp env identity show \
-    --name "$ACA_ENV" \
-    --resource-group "$RG" \
-    --query 'principalId' \
-    --output tsv)
-fi
-
 # Get ACR resource ID
 ACR_ID=$(az acr show \
   --name $ACR_NAME \
@@ -87,11 +57,70 @@ ACR_ID=$(az acr show \
   --query id \
   --output tsv)
 
-# Assign AcrPull role to the Container Apps Environment identity
-az role assignment create \
-  --assignee $ACA_ENV_PRINCIPAL_ID \
-  --role AcrPull \
-  --scope $ACR_ID
+# Create placeholder Container Apps with system-assigned managed identities
+# These will be updated by GitHub Actions with the actual images
+
+# Create Inventory API
+az containerapp create \
+  --name inventory-api \
+  --resource-group $RG \
+  --environment $ACA_ENV \
+  --image mcr.microsoft.com/azuredocs/containerapps-helloworld:latest \
+  --target-port 8000 \
+  --ingress internal \
+  --min-replicas 1 \
+  --max-replicas 5 \
+  --system-assigned
+
+# Create Orders API
+az containerapp create \
+  --name orders-api \
+  --resource-group $RG \
+  --environment $ACA_ENV \
+  --image mcr.microsoft.com/azuredocs/containerapps-helloworld:latest \
+  --target-port 8001 \
+  --ingress internal \
+  --min-replicas 1 \
+  --max-replicas 5 \
+  --system-assigned
+
+# Create Storefront Frontend
+az containerapp create \
+  --name storefront-frontend \
+  --resource-group $RG \
+  --environment $ACA_ENV \
+  --image mcr.microsoft.com/azuredocs/containerapps-helloworld:latest \
+  --target-port 8080 \
+  --ingress external \
+  --min-replicas 1 \
+  --max-replicas 5 \
+  --system-assigned
+
+# Get managed identity principal IDs and assign ACR Pull role
+for APP_NAME in inventory-api orders-api storefront-frontend; do
+  PRINCIPAL_ID=$(az containerapp show \
+    --name $APP_NAME \
+    --resource-group $RG \
+    --query identity.principalId \
+    --output tsv)
+  
+  echo "Assigning AcrPull to $APP_NAME (Principal ID: $PRINCIPAL_ID)"
+  
+  az role assignment create \
+    --assignee $PRINCIPAL_ID \
+    --role AcrPull \
+    --scope $ACR_ID
+done
+
+# Configure Container Apps to use ACR with managed identity
+for APP_NAME in inventory-api orders-api storefront-frontend; do
+  echo "Configuring $APP_NAME to use ACR..."
+  az containerapp registry set \
+    --name $APP_NAME \
+    --resource-group $RG \
+    --server ${ACR_NAME}.azurecr.io \
+    --identity system
+done
 
 # Create Application Insights
 az monitor app-insights component create \
@@ -166,6 +195,8 @@ Add these secrets to your GitHub repository (Settings → Secrets and variables 
 5. **ACA_ENV_NAME**: `aca-env-otel-demo`
 6. **ACA_RG**: `rg-aca-otel-demo`
 7. **APPLICATIONINSIGHTS_CONNECTION_STRING**: Connection string from step 1
+
+### 3. Deploy
 
 ## 📊 Viewing Telemetry
 
