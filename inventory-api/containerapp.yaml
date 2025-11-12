@@ -1,12 +1,7 @@
 properties:
   environmentId: {aca-env-resource-id}
-  identity:
-    type: SystemAssigned
   configuration:
     activeRevisionsMode: Single
-    registries:
-      - server: {acr-name}.azurecr.io
-        identity: system
     ingress:
       external: false
       targetPort: 8000
