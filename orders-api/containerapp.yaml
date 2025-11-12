@@ -22,7 +22,7 @@ properties:
           - name: OTEL_SERVICE_NAME
             value: orders-api
           - name: OTEL_RESOURCE_ATTRIBUTES
-            value: service.namespace=aca-demo,service.instance.id=$(HOSTNAME)
+            value: service.namespace=demo
     scale:
       minReplicas: 1
       maxReplicas: 5

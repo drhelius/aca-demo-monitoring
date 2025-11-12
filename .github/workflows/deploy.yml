@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-and-deploy-inventory-api:
-    name: Build and Deploy Inventory API
+    name: Inventory API
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -58,7 +58,7 @@ jobs:
         resourceGroup: ${{ secrets.ACA_RG }}
 
   build-and-deploy-orders-api:
-    name: Build and Deploy Orders API
+    name: Orders API
     runs-on: ubuntu-latest
     needs: build-and-deploy-inventory-api
     permissions:
@@ -116,7 +116,7 @@ jobs:
         resourceGroup: ${{ secrets.ACA_RG }}
 
   build-and-deploy-storefront:
-    name: Build and Deploy Storefront Frontend
+    name: Storefront Frontend
     runs-on: ubuntu-latest
     needs: build-and-deploy-orders-api
     permissions:
