@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 # Get Application Insights connection string from environment
 connection_string = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
 
+# Instrument HTTPX before configuring Azure Monitor
+HTTPXClientInstrumentor().instrument()
+
 # Configure Azure Monitor (traces, metrics, and logs)
 if connection_string:
     configure_azure_monitor(
@@ -34,7 +37,6 @@ app = FastAPI(title="Inventory API", version="1.0.0")
 
 # Instrument FastAPI with OpenTelemetry
 FastAPIInstrumentor.instrument_app(app)
-HTTPXClientInstrumentor().instrument()
 
 # Get tracer and meter
 tracer = trace.get_tracer(__name__)

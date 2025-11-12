@@ -3,7 +3,6 @@ from pydantic import BaseModel
 from opentelemetry import trace, metrics
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
-from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 from azure.monitor.opentelemetry import configure_azure_monitor
 import httpx
 import os
@@ -20,6 +19,9 @@ connection_string = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
 
 # Get Inventory API URL from environment
 INVENTORY_API_URL = os.getenv("INVENTORY_API_URL", "http://localhost:8000")
+
+# Instrument HTTPX before configuring Azure Monitor
+HTTPXClientInstrumentor().instrument()
 
 # Configure Azure Monitor (traces, metrics, and logs)
 if connection_string:
@@ -41,7 +43,6 @@ app = FastAPI(title="Orders API", version="1.0.0")
 
 # Instrument FastAPI with OpenTelemetry
 FastAPIInstrumentor.instrument_app(app)
-HTTPXClientInstrumentor().instrument()
 
 # Get tracer and meter
 tracer = trace.get_tracer(__name__)

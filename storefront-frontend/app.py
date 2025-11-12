@@ -20,6 +20,9 @@ connection_string = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
 # Get Orders API URL from environment
 ORDERS_API_URL = os.getenv("ORDERS_API_URL", "http://localhost:8001")
 
+# Instrument HTTPX before configuring Azure Monitor
+HTTPXClientInstrumentor().instrument()
+
 # Configure Azure Monitor (traces, metrics, and logs)
 if connection_string:
     configure_azure_monitor(
@@ -40,7 +43,6 @@ app = FastAPI(title="Storefront Frontend", version="1.0.0")
 
 # Instrument FastAPI with OpenTelemetry
 FastAPIInstrumentor.instrument_app(app)
-HTTPXClientInstrumentor().instrument()
 
 # Get tracer and meter
 tracer = trace.get_tracer(__name__)
