@@ -48,8 +48,50 @@ az containerapp env create \
 az acr create \
   --resource-group $RG \
   --name $ACR_NAME \
-  --sku Basic \
-  --admin-enabled true
+  --sku Basic
+
+# Grant AcrPull permission to Container Apps Environment
+# This allows Container Apps to pull images from ACR
+ACA_ENV_IDENTITY=$(az containerapp env show \
+  --name $ACA_ENV \
+  --resource-group $RG \
+  --query properties.appLogsConfiguration.logAnalyticsConfiguration.customerId \
+  --output tsv)
+
+# Get the Container Apps Environment's system-assigned identity
+ACA_ENV_PRINCIPAL_ID=$(az containerapp env show \
+  --name $ACA_ENV \
+  --resource-group $RG \
+  --query identity.principalId \
+  --output tsv)
+
+# If the environment doesn't have a managed identity, enable it
+if [ -z "$ACA_ENV_PRINCIPAL_ID" ] || [ "$ACA_ENV_PRINCIPAL_ID" == "null" ]; then
+    az containerapp env identity assign \
+    --name "$ACA_ENV" \
+    --resource-group "$RG" \
+    --system-assigned
+
+    # Leer el principalId del Environment
+    ACA_ENV_PRINCIPAL_ID=$(az containerapp env identity show \
+    --name "$ACA_ENV" \
+    --resource-group "$RG" \
+    --query 'principalId' \
+    --output tsv)
+fi
+
+# Get ACR resource ID
+ACR_ID=$(az acr show \
+  --name $ACR_NAME \
+  --resource-group $RG \
+  --query id \
+  --output tsv)
+
+# Assign AcrPull role to the Container Apps Environment identity
+az role assignment create \
+  --assignee $ACA_ENV_PRINCIPAL_ID \
+  --role AcrPull \
+  --scope $ACR_ID
 
 # Create Application Insights
 az monitor app-insights component create \
