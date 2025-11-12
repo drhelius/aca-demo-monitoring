@@ -1,0 +1,28 @@
+properties:
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: false
+      targetPort: 8001
+      transport: auto
+      allowInsecure: false
+  template:
+    containers:
+      - name: orders-api
+        image: {acr-name}.azurecr.io/orders-api:{image-tag}
+        resources:
+          cpu: 0.25
+          memory: 0.5Gi
+        env:
+          - name: APPLICATIONINSIGHTS_CONNECTION_STRING
+            value: {app-insights-connection-string}
+          - name: INVENTORY_API_URL
+            value: https://inventory-api.{aca-env-default-domain}
+    scale:
+      minReplicas: 1
+      maxReplicas: 5
+      rules:
+        - name: http-rule
+          http:
+            metadata:
+              concurrentRequests: '20'

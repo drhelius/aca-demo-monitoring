@@ -1,0 +1,26 @@
+properties:
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: false
+      targetPort: 8000
+      transport: auto
+      allowInsecure: false
+  template:
+    containers:
+      - name: inventory-api
+        image: {acr-name}.azurecr.io/inventory-api:{image-tag}
+        resources:
+          cpu: 0.25
+          memory: 0.5Gi
+        env:
+          - name: APPLICATIONINSIGHTS_CONNECTION_STRING
+            value: {app-insights-connection-string}
+    scale:
+      minReplicas: 1
+      maxReplicas: 5
+      rules:
+        - name: http-rule
+          http:
+            metadata:
+              concurrentRequests: '20'

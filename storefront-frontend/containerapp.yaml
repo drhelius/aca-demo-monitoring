@@ -1,0 +1,28 @@
+properties:
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: true
+      targetPort: 8080
+      transport: auto
+      allowInsecure: false
+  template:
+    containers:
+      - name: storefront-frontend
+        image: {acr-name}.azurecr.io/storefront-frontend:{image-tag}
+        resources:
+          cpu: 0.25
+          memory: 0.5Gi
+        env:
+          - name: APPLICATIONINSIGHTS_CONNECTION_STRING
+            value: {app-insights-connection-string}
+          - name: ORDERS_API_URL
+            value: https://orders-api.{aca-env-default-domain}
+    scale:
+      minReplicas: 1
+      maxReplicas: 5
+      rules:
+        - name: http-rule
+          http:
+            metadata:
+              concurrentRequests: '20'

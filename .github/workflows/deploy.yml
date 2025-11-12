@@ -1,0 +1,150 @@
+name: Deploy to Azure Container Apps
+
+on:
+  workflow_dispatch:
+  push:
+    paths-ignore:
+      - '**.md'
+
+jobs:
+  build-and-deploy-inventory-api:
+    name: Build and Deploy Inventory API
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Azure login
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Build and push Inventory API
+      run: |
+        az acr build \
+          --registry ${{ secrets.ACR_NAME }} \
+          --image inventory-api:${{ github.sha }} \
+          --file ./inventory-api/Dockerfile \
+          ./inventory-api
+
+    - name: Replace placeholders in containerapp.yaml
+      run: |
+        sed -i "s/{acr-name}/${{ secrets.ACR_NAME }}/g" inventory-api/containerapp.yaml
+        sed -i "s/{image-tag}/${{ github.sha }}/g" inventory-api/containerapp.yaml
+        sed -i "s|{app-insights-connection-string}|${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}|g" inventory-api/containerapp.yaml
+
+    - name: Deploy Inventory API Container App
+      uses: azure/container-apps-deploy-action@v1
+      with:
+        yamlConfigPath: inventory-api/containerapp.yaml
+        containerAppName: inventory-api
+        containerAppEnvironment: ${{ secrets.ACA_ENV_NAME }}
+        resourceGroup: ${{ secrets.ACA_RG }}
+
+  build-and-deploy-orders-api:
+    name: Build and Deploy Orders API
+    runs-on: ubuntu-latest
+    needs: build-and-deploy-inventory-api
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Azure login
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Get ACA Environment Default Domain
+      id: get-env-domain
+      run: |
+        DOMAIN=$(az containerapp env show \
+          --name ${{ secrets.ACA_ENV_NAME }} \
+          --resource-group ${{ secrets.ACA_RG }} \
+          --query properties.defaultDomain \
+          --output tsv)
+        echo "domain=$DOMAIN" >> $GITHUB_OUTPUT
+
+    - name: Build and push Orders API
+      run: |
+        az acr build \
+          --registry ${{ secrets.ACR_NAME }} \
+          --image orders-api:${{ github.sha }} \
+          --file ./orders-api/Dockerfile \
+          ./orders-api
+
+    - name: Replace placeholders in containerapp.yaml
+      run: |
+        sed -i "s/{acr-name}/${{ secrets.ACR_NAME }}/g" orders-api/containerapp.yaml
+        sed -i "s/{image-tag}/${{ github.sha }}/g" orders-api/containerapp.yaml
+        sed -i "s|{app-insights-connection-string}|${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}|g" orders-api/containerapp.yaml
+        sed -i "s/{aca-env-default-domain}/${{ steps.get-env-domain.outputs.domain }}/g" orders-api/containerapp.yaml
+
+    - name: Deploy Orders API Container App
+      uses: azure/container-apps-deploy-action@v1
+      with:
+        yamlConfigPath: orders-api/containerapp.yaml
+        containerAppName: orders-api
+        containerAppEnvironment: ${{ secrets.ACA_ENV_NAME }}
+        resourceGroup: ${{ secrets.ACA_RG }}
+
+  build-and-deploy-storefront:
+    name: Build and Deploy Storefront Frontend
+    runs-on: ubuntu-latest
+    needs: build-and-deploy-orders-api
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Azure login
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Get ACA Environment Default Domain
+      id: get-env-domain
+      run: |
+        DOMAIN=$(az containerapp env show \
+          --name ${{ secrets.ACA_ENV_NAME }} \
+          --resource-group ${{ secrets.ACA_RG }} \
+          --query properties.defaultDomain \
+          --output tsv)
+        echo "domain=$DOMAIN" >> $GITHUB_OUTPUT
+
+    - name: Build and push Storefront Frontend
+      run: |
+        az acr build \
+          --registry ${{ secrets.ACR_NAME }} \
+          --image storefront-frontend:${{ github.sha }} \
+          --file ./storefront-frontend/Dockerfile \
+          ./storefront-frontend
+
+    - name: Replace placeholders in containerapp.yaml
+      run: |
+        sed -i "s/{acr-name}/${{ secrets.ACR_NAME }}/g" storefront-frontend/containerapp.yaml
+        sed -i "s/{image-tag}/${{ github.sha }}/g" storefront-frontend/containerapp.yaml
+        sed -i "s|{app-insights-connection-string}|${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}|g" storefront-frontend/containerapp.yaml
+        sed -i "s/{aca-env-default-domain}/${{ steps.get-env-domain.outputs.domain }}/g" storefront-frontend/containerapp.yaml
+
+    - name: Deploy Storefront Frontend Container App
+      uses: azure/container-apps-deploy-action@v1
+      with:
+        yamlConfigPath: storefront-frontend/containerapp.yaml
+        containerAppName: storefront-frontend
+        containerAppEnvironment: ${{ secrets.ACA_ENV_NAME }}
+        resourceGroup: ${{ secrets.ACA_RG }}
+
