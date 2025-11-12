@@ -18,7 +18,7 @@ properties:
           - name: APPLICATIONINSIGHTS_CONNECTION_STRING
             value: {app-insights-connection-string}
           - name: INVENTORY_API_URL
-            value: http://inventory-api.{aca-env-default-domain}
+            value: https://inventory-api
     scale:
       minReplicas: 1
       maxReplicas: 5
