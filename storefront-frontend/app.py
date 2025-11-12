@@ -2,17 +2,9 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from opentelemetry import trace, metrics
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-from opentelemetry.sdk.resources import Resource
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
-from azure.monitor.opentelemetry.exporter import (
-    AzureMonitorTraceExporter,
-    AzureMonitorMetricExporter,
-)
+from azure.monitor.opentelemetry import configure_azure_monitor
 import httpx
 import os
 import logging
@@ -28,35 +20,20 @@ connection_string = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
 # Get Orders API URL from environment
 ORDERS_API_URL = os.getenv("ORDERS_API_URL", "http://localhost:8001")
 
-# Configure OpenTelemetry resource
-resource = Resource.create(
-    {
-        "service.name": "storefront-frontend",
-        "service.version": "1.0.0",
-        "service.instance.id": os.getenv("HOSTNAME", "localhost"),
-    }
-)
-
-# Configure tracing
+# Configure Azure Monitor (traces, metrics, and logs)
 if connection_string:
-    trace_provider = TracerProvider(resource=resource)
-    trace_exporter = AzureMonitorTraceExporter(connection_string=connection_string)
-    trace_provider.add_span_processor(BatchSpanProcessor(trace_exporter))
-    trace.set_tracer_provider(trace_provider)
-    logger.info("Azure Monitor tracing configured")
-else:
-    logger.warning("APPLICATIONINSIGHTS_CONNECTION_STRING not set, traces will not be exported")
-
-# Configure metrics
-if connection_string:
-    metric_reader = PeriodicExportingMetricReader(
-        AzureMonitorMetricExporter(connection_string=connection_string)
+    configure_azure_monitor(
+        connection_string=connection_string,
+        resource_attributes={
+            "service.name": "storefront-frontend",
+            "service.version": "1.0.0",
+            "service.instance.id": os.getenv("HOSTNAME", "localhost"),
+        },
+        enable_live_metrics=True,
     )
-    meter_provider = MeterProvider(resource=resource, metric_readers=[metric_reader])
-    metrics.set_meter_provider(meter_provider)
-    logger.info("Azure Monitor metrics configured")
+    logger.info("Azure Monitor configured (traces, metrics, and logs)")
 else:
-    logger.warning("APPLICATIONINSIGHTS_CONNECTION_STRING not set, metrics will not be exported")
+    logger.warning("APPLICATIONINSIGHTS_CONNECTION_STRING not set, telemetry will not be exported")
 
 # Create FastAPI app
 app = FastAPI(title="Storefront Frontend", version="1.0.0")

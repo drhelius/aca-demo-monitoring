@@ -90,22 +90,3 @@ All three services are fully instrumented with OpenTelemetry:
 
 For complete setup instructions see the **[QUICKSTART.md](QUICKSTART.md)** guide.
 
-## 🔧 Configuration
-
-### Environment Variables
-
-Each service requires:
-- `APPLICATIONINSIGHTS_CONNECTION_STRING` - Application Insights connection string
-
-Additionally:
-- **Orders API**: `INVENTORY_API_URL` - URL to Inventory API
-- **Frontend**: `ORDERS_API_URL` - URL to Orders API
-
-### Container App Settings
-
-- **Ingress**:
-  - Frontend: External (public access)
-  - Orders API: Internal only
-  - Inventory API: Internal only
-- **Scaling**: 1-5 replicas based on HTTP concurrency (20 concurrent requests)
-- **Resources**: 0.25 CPU, 0.5Gi memory per container
