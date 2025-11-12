@@ -17,6 +17,10 @@ properties:
         env:
           - name: APPLICATIONINSIGHTS_CONNECTION_STRING
             value: {app-insights-connection-string}
+          - name: OTEL_SERVICE_NAME
+            value: inventory-api
+          - name: OTEL_RESOURCE_ATTRIBUTES
+            value: service.namespace=aca-demo,service.instance.id=$(HOSTNAME)
     scale:
       minReplicas: 1
       maxReplicas: 5

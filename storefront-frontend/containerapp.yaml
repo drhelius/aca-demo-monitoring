@@ -24,6 +24,10 @@ properties:
             value: {app-insights-connection-string}
           - name: ORDERS_API_URL
             value: http://orders-api
+          - name: OTEL_SERVICE_NAME
+            value: storefront-frontend
+          - name: OTEL_RESOURCE_ATTRIBUTES
+            value: service.namespace=aca-demo,service.instance.id=$(HOSTNAME)
     scale:
       minReplicas: 1
       maxReplicas: 5
