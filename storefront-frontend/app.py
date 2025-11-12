@@ -114,23 +114,47 @@ async def get_orders():
                 if response.status_code != 200:
                     logger.error(f"Failed to fetch orders: {response.status_code}")
                     span.set_attribute("orders.fetch_success", False)
+                    try:
+                        error_detail = response.json().get("detail", response.text)
+                    except:
+                        error_detail = response.text or f"HTTP {response.status_code}"
                     raise HTTPException(
                         status_code=response.status_code,
-                        detail="Failed to fetch orders from Orders API",
+                        detail=f"Orders API error: {error_detail}",
                     )
                 
-                orders_data = response.json()
+                try:
+                    orders_data = response.json()
+                except Exception as json_err:
+                    logger.error(f"Failed to parse orders response as JSON: {json_err}. Response: {response.text[:200]}")
+                    span.set_attribute("orders.error", "invalid_json_response")
+                    raise HTTPException(
+                        status_code=502,
+                        detail=f"Invalid response from orders service. Response: {response.text[:100]}",
+                    )
                 span.set_attribute("orders.fetch_success", True)
                 span.set_attribute("orders.count", orders_data.get("total", 0))
                 logger.info(f"Fetched {orders_data.get('total', 0)} orders")
                 return orders_data
                 
         except httpx.RequestError as e:
-            logger.error(f"Error communicating with orders service: {e}")
+            error_msg = f"Network error communicating with orders service at {ORDERS_API_URL}: {type(e).__name__}: {str(e)}"
+            logger.error(error_msg)
             span.set_attribute("orders.error", str(e))
+            span.set_attribute("orders.error_type", type(e).__name__)
             raise HTTPException(
                 status_code=503,
-                detail=f"Unable to reach orders service: {str(e)}",
+                detail=error_msg,
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            error_msg = f"Unexpected error fetching orders: {type(e).__name__}: {str(e)}"
+            logger.error(error_msg)
+            span.set_attribute("orders.error", str(e))
+            raise HTTPException(
+                status_code=500,
+                detail=error_msg,
             )
 
 
@@ -165,11 +189,23 @@ async def get_order(order_id: int):
                 return order_data
                 
         except httpx.RequestError as e:
-            logger.error(f"Error communicating with orders service: {e}")
+            error_msg = f"Network error communicating with orders service at {ORDERS_API_URL}: {type(e).__name__}: {str(e)}"
+            logger.error(error_msg)
             span.set_attribute("orders.error", str(e))
+            span.set_attribute("orders.error_type", type(e).__name__)
             raise HTTPException(
                 status_code=503,
-                detail=f"Unable to reach orders service: {str(e)}",
+                detail=error_msg,
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            error_msg = f"Unexpected error fetching order {order_id}: {type(e).__name__}: {str(e)}"
+            logger.error(error_msg)
+            span.set_attribute("orders.error", str(e))
+            raise HTTPException(
+                status_code=500,
+                detail=error_msg,
             )
 
 
@@ -191,7 +227,10 @@ async def create_order(order_data: dict):
                 )
                 
                 if response.status_code != 200:
-                    error_detail = response.json().get("detail", "Unknown error")
+                    try:
+                        error_detail = response.json().get("detail", response.text)
+                    except:
+                        error_detail = response.text or f"HTTP {response.status_code}"
                     logger.error(f"Failed to create order: {error_detail}")
                     span.set_attribute("orders.create_success", False)
                     span.set_attribute("orders.error", error_detail)
@@ -200,7 +239,15 @@ async def create_order(order_data: dict):
                         detail=error_detail,
                     )
                 
-                order_result = response.json()
+                try:
+                    order_result = response.json()
+                except Exception as json_err:
+                    logger.error(f"Failed to parse order creation response as JSON: {json_err}. Response: {response.text[:200]}")
+                    span.set_attribute("orders.error", "invalid_json_response")
+                    raise HTTPException(
+                        status_code=502,
+                        detail=f"Invalid response from orders service. Response: {response.text[:100]}",
+                    )
                 span.set_attribute("orders.create_success", True)
                 span.set_attribute("orders.order_id", order_result.get("order_id"))
                 span.set_attribute("orders.total_value", order_result.get("total_value", 0))
@@ -208,11 +255,23 @@ async def create_order(order_data: dict):
                 return order_result
                 
         except httpx.RequestError as e:
-            logger.error(f"Error communicating with orders service: {e}")
+            error_msg = f"Network error communicating with orders service at {ORDERS_API_URL}: {type(e).__name__}: {str(e)}"
+            logger.error(error_msg)
             span.set_attribute("orders.error", str(e))
+            span.set_attribute("orders.error_type", type(e).__name__)
             raise HTTPException(
                 status_code=503,
-                detail=f"Unable to reach orders service: {str(e)}",
+                detail=error_msg,
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            error_msg = f"Unexpected error creating order: {type(e).__name__}: {str(e)}"
+            logger.error(error_msg)
+            span.set_attribute("orders.error", str(e))
+            raise HTTPException(
+                status_code=500,
+                detail=error_msg,
             )
 
 

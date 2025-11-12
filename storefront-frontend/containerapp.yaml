@@ -1,7 +1,12 @@
 properties:
   environmentId: {aca-env-resource-id}
+  identity:
+    type: SystemAssigned
   configuration:
     activeRevisionsMode: Single
+    registries:
+      - server: {acr-name}.azurecr.io
+        identity: system
     ingress:
       external: true
       targetPort: 8080
@@ -18,7 +23,7 @@ properties:
           - name: APPLICATIONINSIGHTS_CONNECTION_STRING
             value: {app-insights-connection-string}
           - name: ORDERS_API_URL
-            value: https://orders-api.{aca-env-default-domain}
+            value: http://orders-api.{aca-env-default-domain}
     scale:
       minReplicas: 1
       maxReplicas: 5

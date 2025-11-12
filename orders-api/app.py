@@ -168,18 +168,31 @@ async def create_order(order_request: CreateOrderRequest):
                         # Check inventory availability
                         logger.info(f"Checking inventory for {item.product_id}")
                         inv_response = await client.get(
-                            f"{INVENTORY_API_URL}/api/inventory/{item.product_id}"
+                            f"{INVENTORY_API_URL}/api/inventory/{item.product_id}",
+                            timeout=10.0
                         )
                         
                         if inv_response.status_code != 200:
-                            logger.error(f"Product not found in inventory: {item.product_id}")
+                            logger.error(f"Product not found in inventory: {item.product_id}, status: {inv_response.status_code}")
                             inv_span.set_attribute("inventory.check_success", False)
+                            try:
+                                error_detail = inv_response.json().get("detail", inv_response.text)
+                            except:
+                                error_detail = inv_response.text or f"HTTP {inv_response.status_code}"
                             raise HTTPException(
-                                status_code=404,
-                                detail=f"Product {item.product_id} not found in inventory",
+                                status_code=503,
+                                detail=f"Inventory service error for {item.product_id}: {error_detail}",
                             )
                         
-                        inventory_data = inv_response.json()
+                        try:
+                            inventory_data = inv_response.json()
+                        except Exception as json_err:
+                            logger.error(f"Failed to parse inventory response as JSON: {json_err}. Response: {inv_response.text[:200]}")
+                            inv_span.set_attribute("inventory.error", "invalid_json_response")
+                            raise HTTPException(
+                                status_code=502,
+                                detail=f"Invalid response from inventory service. Response was: {inv_response.text[:100]}",
+                            )
                         inv_span.set_attribute("inventory.available_stock", inventory_data["stock"])
                         
                         if inventory_data["stock"] < item.quantity:
@@ -195,14 +208,19 @@ async def create_order(order_request: CreateOrderRequest):
                         reserve_response = await client.post(
                             f"{INVENTORY_API_URL}/api/inventory/{item.product_id}/reserve",
                             params={"quantity": item.quantity},
+                            timeout=10.0
                         )
                         
                         if reserve_response.status_code != 200:
-                            logger.error(f"Failed to reserve inventory for {item.product_id}")
+                            logger.error(f"Failed to reserve inventory for {item.product_id}: {reserve_response.status_code}")
                             inv_span.set_attribute("inventory.reservation_success", False)
+                            try:
+                                error_detail = reserve_response.json().get("detail", reserve_response.text)
+                            except:
+                                error_detail = reserve_response.text or f"HTTP {reserve_response.status_code}"
                             raise HTTPException(
-                                status_code=500,
-                                detail=f"Failed to reserve inventory for {item.product_id}",
+                                status_code=503,
+                                detail=f"Failed to reserve inventory for {item.product_id}: {error_detail}",
                             )
                         
                         inv_span.set_attribute("inventory.check_success", True)
@@ -220,11 +238,23 @@ async def create_order(order_request: CreateOrderRequest):
                         })
                         
                     except httpx.RequestError as e:
-                        logger.error(f"Error communicating with inventory service: {e}")
+                        error_msg = f"Network error communicating with inventory service at {INVENTORY_API_URL}: {type(e).__name__}: {str(e)}"
+                        logger.error(error_msg)
                         inv_span.set_attribute("inventory.error", str(e))
+                        inv_span.set_attribute("inventory.error_type", type(e).__name__)
                         raise HTTPException(
                             status_code=503,
-                            detail=f"Unable to reach inventory service: {str(e)}",
+                            detail=f"Unable to reach inventory service: {error_msg}",
+                        )
+                    except HTTPException:
+                        raise
+                    except Exception as e:
+                        error_msg = f"Unexpected error processing inventory for {item.product_id}: {type(e).__name__}: {str(e)}"
+                        logger.error(error_msg)
+                        inv_span.set_attribute("inventory.error", str(e))
+                        raise HTTPException(
+                            status_code=500,
+                            detail=error_msg,
                         )
         
         # Create order
