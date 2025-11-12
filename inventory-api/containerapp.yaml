@@ -6,7 +6,7 @@ properties:
       external: false
       targetPort: 8000
       transport: auto
-      allowInsecure: false
+      allowInsecure: true
   template:
     containers:
       - name: inventory-api

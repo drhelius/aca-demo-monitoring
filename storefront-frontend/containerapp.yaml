@@ -23,7 +23,7 @@ properties:
           - name: APPLICATIONINSIGHTS_CONNECTION_STRING
             value: {app-insights-connection-string}
           - name: ORDERS_API_URL
-            value: https://orders-api
+            value: http://orders-api:8001
     scale:
       minReplicas: 1
       maxReplicas: 5

@@ -6,7 +6,7 @@ properties:
       external: false
       targetPort: 8001
       transport: auto
-      allowInsecure: false
+      allowInsecure: true
   template:
     containers:
       - name: orders-api
@@ -18,7 +18,7 @@ properties:
           - name: APPLICATIONINSIGHTS_CONNECTION_STRING
             value: {app-insights-connection-string}
           - name: INVENTORY_API_URL
-            value: https://inventory-api
+            value: http://inventory-api:8000
     scale:
       minReplicas: 1
       maxReplicas: 5
