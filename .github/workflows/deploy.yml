@@ -24,6 +24,16 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+    - name: Get ACA Environment ID
+      id: get-env-id
+      run: |
+        ENV_ID=$(az containerapp env show \
+          --name ${{ secrets.ACA_ENV_NAME }} \
+          --resource-group ${{ secrets.ACA_RG }} \
+          --query id \
+          --output tsv)
+        echo "env-id=$ENV_ID" >> $GITHUB_OUTPUT
+
     - name: Build and push Inventory API
       run: |
         az acr build \
@@ -37,6 +47,7 @@ jobs:
         sed -i "s/{acr-name}/${{ secrets.ACR_NAME }}/g" inventory-api/containerapp.yaml
         sed -i "s/{image-tag}/${{ github.sha }}/g" inventory-api/containerapp.yaml
         sed -i "s|{app-insights-connection-string}|${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}|g" inventory-api/containerapp.yaml
+        sed -i "s|{aca-env-resource-id}|${{ steps.get-env-id.outputs.env-id }}|g" inventory-api/containerapp.yaml
 
     - name: Deploy Inventory API Container App
       uses: azure/container-apps-deploy-action@v1
@@ -64,14 +75,20 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-    - name: Get ACA Environment Default Domain
-      id: get-env-domain
+    - name: Get ACA Environment ID and Default Domain
+      id: get-env-info
       run: |
+        ENV_ID=$(az containerapp env show \
+          --name ${{ secrets.ACA_ENV_NAME }} \
+          --resource-group ${{ secrets.ACA_RG }} \
+          --query id \
+          --output tsv)
         DOMAIN=$(az containerapp env show \
           --name ${{ secrets.ACA_ENV_NAME }} \
           --resource-group ${{ secrets.ACA_RG }} \
           --query properties.defaultDomain \
           --output tsv)
+        echo "env-id=$ENV_ID" >> $GITHUB_OUTPUT
         echo "domain=$DOMAIN" >> $GITHUB_OUTPUT
 
     - name: Build and push Orders API
@@ -87,7 +104,8 @@ jobs:
         sed -i "s/{acr-name}/${{ secrets.ACR_NAME }}/g" orders-api/containerapp.yaml
         sed -i "s/{image-tag}/${{ github.sha }}/g" orders-api/containerapp.yaml
         sed -i "s|{app-insights-connection-string}|${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}|g" orders-api/containerapp.yaml
-        sed -i "s/{aca-env-default-domain}/${{ steps.get-env-domain.outputs.domain }}/g" orders-api/containerapp.yaml
+        sed -i "s|{aca-env-resource-id}|${{ steps.get-env-info.outputs.env-id }}|g" orders-api/containerapp.yaml
+        sed -i "s/{aca-env-default-domain}/${{ steps.get-env-info.outputs.domain }}/g" orders-api/containerapp.yaml
 
     - name: Deploy Orders API Container App
       uses: azure/container-apps-deploy-action@v1
@@ -115,14 +133,20 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-    - name: Get ACA Environment Default Domain
-      id: get-env-domain
+    - name: Get ACA Environment ID and Default Domain
+      id: get-env-info
       run: |
+        ENV_ID=$(az containerapp env show \
+          --name ${{ secrets.ACA_ENV_NAME }} \
+          --resource-group ${{ secrets.ACA_RG }} \
+          --query id \
+          --output tsv)
         DOMAIN=$(az containerapp env show \
           --name ${{ secrets.ACA_ENV_NAME }} \
           --resource-group ${{ secrets.ACA_RG }} \
           --query properties.defaultDomain \
           --output tsv)
+        echo "env-id=$ENV_ID" >> $GITHUB_OUTPUT
         echo "domain=$DOMAIN" >> $GITHUB_OUTPUT
 
     - name: Build and push Storefront Frontend
@@ -138,7 +162,8 @@ jobs:
         sed -i "s/{acr-name}/${{ secrets.ACR_NAME }}/g" storefront-frontend/containerapp.yaml
         sed -i "s/{image-tag}/${{ github.sha }}/g" storefront-frontend/containerapp.yaml
         sed -i "s|{app-insights-connection-string}|${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}|g" storefront-frontend/containerapp.yaml
-        sed -i "s/{aca-env-default-domain}/${{ steps.get-env-domain.outputs.domain }}/g" storefront-frontend/containerapp.yaml
+        sed -i "s|{aca-env-resource-id}|${{ steps.get-env-info.outputs.env-id }}|g" storefront-frontend/containerapp.yaml
+        sed -i "s/{aca-env-default-domain}/${{ steps.get-env-info.outputs.domain }}/g" storefront-frontend/containerapp.yaml
 
     - name: Deploy Storefront Frontend Container App
       uses: azure/container-apps-deploy-action@v1
